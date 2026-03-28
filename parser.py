@@ -211,7 +211,7 @@ class GoogleSheetsExporter:
             spreadsheet.share('', perm_type='anyone', role='reader')
     
     def export(self, data: List[Dict]):
-        """Экспортировать данные в Google Sheets"""
+        """Экспортировать данные в Google Sheets (с накоплением, без дубликатов)"""
         if not self.sheet:
             self.connect()
         
@@ -219,34 +219,60 @@ class GoogleSheetsExporter:
         headers = [
             "Username", "Display Name", "Viewers", "Game", "Title",
             "Started At", "Channel URL", "Discord", "VK", "Telegram",
-            "Email", "Description"
+            "Email", "Description", "First Seen"
         ]
         
-        # Очищаем таблицу
-        self.sheet.clear()
+        # Получаем существующие данные
+        existing_data = self.sheet.get_all_records()
+        existing_usernames = {row["Username"].lower() for row in existing_data if row.get("Username")}
         
-        # Записываем заголовки
-        self.sheet.append_row(headers)
+        # Если таблица пустая, добавляем заголовки
+        if not existing_data:
+            self.sheet.clear()
+            self.sheet.append_row(headers)
         
-        # Записываем данные
+        # Фильтруем новых стримеров (без дубликатов)
+        new_streamers = []
+        duplicates_count = 0
+        current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        
         for item in data:
-            row = [
-                item["username"],
-                item["display_name"],
-                item["viewers"],
-                item["game"],
-                item["title"],
-                item["started_at"],
-                item["channel_url"],
-                item["discord"] or "",
-                item["vk"] or "",
-                item["telegram"] or "",
-                item["email"] or "",
-                item["description"]
-            ]
-            self.sheet.append_row(row)
+            username_lower = item["username"].lower()
+            if username_lower not in existing_usernames:
+                new_streamers.append(item)
+                existing_usernames.add(username_lower)  # Добавляем в set, чтобы избежать дубликатов внутри текущей выборки
+            else:
+                duplicates_count += 1
         
-        print(f"✅ Данные экспортированы в Google Sheets: {self.spreadsheet_name}")
+        # Записываем только новых стримеров
+        if new_streamers:
+            for item in new_streamers:
+                row = [
+                    item["username"],
+                    item["display_name"],
+                    item["viewers"],
+                    item["game"],
+                    item["title"],
+                    item["started_at"],
+                    item["channel_url"],
+                    item["discord"] or "",
+                    item["vk"] or "",
+                    item["telegram"] or "",
+                    item["email"] or "",
+                    item["description"],
+                    current_time
+                ]
+                self.sheet.append_row(row)
+            
+            print(f"✅ Добавлено {len(new_streamers)} новых стримеров")
+        else:
+            print("ℹ️ Новых стримеров не найдено")
+        
+        if duplicates_count > 0:
+            print(f"ℹ️ Пропущено {duplicates_count} дубликатов (уже есть в таблице)")
+        
+        total_count = len(existing_data) + len(new_streamers)
+        print(f"📊 Всего в базе: {total_count} стримеров")
         print(f"🔗 Ссылка: {self.sheet.spreadsheet.url}")
 
 
