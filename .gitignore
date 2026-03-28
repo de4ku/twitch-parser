@@ -1,0 +1,8 @@
+# Twitch Parser
+
+credentials.json
+config.py
+*.pyc
+__pycache__/
+.env
+*.log
