@@ -149,7 +149,7 @@ python parser.py
 
 ## Лицензия
 
-MIT
+GPL v3 — см. файл [LICENSE](LICENSE)
 
 ## Автор
 
